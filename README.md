@@ -18,3 +18,6 @@ Finally, place the following line at the very end of the `~/.bashrc` file to sou
 The history of future Bash sessions will then be written to the file `~/.local/share/gschechtli.sqlite3`.
 Using the up arrow key, one can search this history using `fzf`.
 All commands which were executed in the current directory will be shown in chronological order.
+
+Inspired by [barabo/advanced-shell-history](https://github.com/barabo/advanced-shell-history)
+and [cantino/mcfly](https://github.com/cantino/mcfly).
