@@ -229,10 +229,7 @@ EOF
     return "${previous_status}"
 }
 
-PROMPT_COMMAND="gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\"${PROMPT_COMMAND:+" ; ${PROMPT_COMMAND}"}"
-# PROMPT_COMMAND="${PROMPT_COMMAND:+"${PROMPT_COMMAND} ; "}gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\""
-# PROMPT_COMMAND="gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\""
-
+PROMPT_COMMAND+=("gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\"")
 
 gschechtli_trap_exit_and_term()
 {
