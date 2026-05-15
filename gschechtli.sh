@@ -28,17 +28,8 @@
 #
 # To use this program, source this script at the end of your ~/.bashrc file.
 
-
-if [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}" ]]
-then
-    GSCHECHTLI_DATABASE_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/gschechtli.sqlite3"
-else
-    GSCHECHTLI_DATABASE_FILE="${HOME}/.gschechtli.sqlite3"
-fi
-
-
-if [[ ! -f "${GSCHECHTLI_DATABASE_FILE}" ]]
-then
+gschechtli_initialize_database()
+{
     sqlite3 -safe "${GSCHECHTLI_DATABASE_FILE}" <<'EOF'
 CREATE TABLE sessions (
     id integer primary key autoincrement,
@@ -79,24 +70,7 @@ CREATE TABLE commands (
     UNIQUE(session_id, command_no)
 );
 EOF
-fi
-
-
-if [[ -d "${XDG_CACHE_HOME:-$HOME/.cache}" ]]
-then
-    HISTFILE="${XDG_CACHE_HOME:-$HOME/.cache}/bash_history"
-fi
-
-HISTSIZE=""
-
-HISTFILESIZE=""
-
-HISTCONTROL=""
-
-HISTTIMEFORMAT="%s "
-
-shopt -s histappend
-
+}
 
 gschechtli_session()
 {
@@ -151,17 +125,6 @@ RETURNING id;
 EOF
 )"
 }
-
-gschechtli_session
-
-
-GSCHECHTLI_SKIP=1
-
-builtin trap "GSCHECHTLI_SKIP=1" INT
-
-
-GSCHECHTLI_PWD="${PWD}"
-
 
 gschechtli_prompt_command()
 {
@@ -229,17 +192,12 @@ EOF
     return "${previous_status}"
 }
 
-PROMPT_COMMAND+=("gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\"")
-
 gschechtli_trap_exit_and_term()
 {
     gschechtli_prompt_command "$1" "$2"
     sqlite3 -safe "${GSCHECHTLI_DATABASE_FILE}" "UPDATE sessions SET end_time = $( date +%s ) WHERE id = ${GSCHECHTLI_SESSION_NUMBER} ;"
     return "$1"
 }
-
-builtin trap "gschechtli_trap_exit_and_term \"\${?}\" \"\${PIPESTATUS[*]}\"" EXIT TERM
-
 
 gschechtli_history_search()
 {
@@ -261,7 +219,6 @@ gschechtli_history_search()
     fi
 }
 
-
 # https://superuser.com/a/1662149
 gschechtli_history_prompt()
 {
@@ -276,7 +233,54 @@ gschechtli_history_prompt()
     fi
 }
 
-if [[ -x /usr/bin/fzf ]]
-then
-    builtin bind -x '"\e[A": "gschechtli_history_prompt"'
-fi
+gschechtli_initialize()
+{
+    if [[ ! -v GSCHECHTLI_DATABASE_FILE ]]
+    then
+        if [[ -d "${XDG_DATA_HOME:-${HOME}/.local/share}" ]]
+        then
+            GSCHECHTLI_DATABASE_FILE="${XDG_DATA_HOME:-${HOME}/.local/share}/gschechtli.sqlite3"
+        else
+            GSCHECHTLI_DATABASE_FILE="${HOME}/.gschechtli.sqlite3"
+        fi
+    fi
+
+    if [[ ! -f "${GSCHECHTLI_DATABASE_FILE}" ]]
+    then
+        gschechtli_initialize_database
+    fi
+
+    gschechtli_session
+
+    if [[ -d "${XDG_CACHE_HOME:-${HOME}/.cache}" ]]
+    then
+        HISTFILE="${XDG_CACHE_HOME:-${HOME}/.cache}/bash_history"
+    fi
+
+    HISTSIZE=""
+
+    HISTFILESIZE=""
+
+    HISTCONTROL=""
+
+    HISTTIMEFORMAT="%s "
+
+    shopt -s histappend
+
+    GSCHECHTLI_SKIP=1
+
+    builtin trap "GSCHECHTLI_SKIP=1" INT
+
+    GSCHECHTLI_PWD="${PWD}"
+
+    PROMPT_COMMAND+=("gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\"")
+
+    builtin trap "gschechtli_trap_exit_and_term \"\${?}\" \"\${PIPESTATUS[*]}\"" EXIT TERM
+
+    if [[ -x /usr/bin/fzf ]]
+    then
+        builtin bind -x '"\e[A": "gschechtli_history_prompt"'
+    fi
+}
+
+gschechtli_initialize
