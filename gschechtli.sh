@@ -128,8 +128,13 @@ EOF
 
 gschechtli_prompt_command()
 {
-    local previous_status="$1"
-    local previous_pipestatus="$2"
+    local end_time
+    end_time="${EPOCHREALTIME}"
+
+    local previous_status
+    previous_status="$1"
+    local previous_pipestatus
+    previous_pipestatus="$2"
 
     if [[ "${GSCHECHTLI_SKIP:-1}" == "1" ]]
     then
@@ -140,12 +145,49 @@ gschechtli_prompt_command()
     local entry
     entry="$( builtin history 1 )"
     entry="${entry#"${entry%%[![:space:]]*}"}"
-    local previous_number="${entry%%[![:digit:]]*}"
+    local entry_number
+    entry_number="${entry%%[![:digit:]]*}"
     entry="${entry#"${entry%%[![:digit:]]*}"}"
     entry="${entry#"${entry%%[![:space:]]*}"}"
-    local previous_timestamp="${entry%%[![:digit:]]*}"
+    local entry_timestamp
+    entry_timestamp="${entry%%[![:digit:]]*}"
     entry="${entry#"${entry%%[![:digit:]]*}"}"
-    local previous_command="${entry# }"
+    local entry_command
+    entry_command="${entry# }"
+
+    builtin history -a
+
+    sqlite3 -safe "${GSCHECHTLI_DATABASE_FILE}" <<EOF
+UPDATE commands
+SET
+    rval = '${previous_status//\'/\'\'}',
+    end_time = '${end_time//\'/\'\'}',
+    pipe_vals = '${previous_pipestatus//\'/\'\'}'
+WHERE (
+    session_id = '${GSCHECHTLI_SESSION_NUMBER//\'/\'\'}'
+    AND command_no = '${entry_number//\'/\'\'}'
+    AND (rval IS NULL OR rval = '')
+)
+;
+EOF
+
+    return "${previous_status}"
+}
+
+gschechtli_ps0_command()
+{
+    local entry
+    entry="$( builtin history 1 )"
+    entry="${entry#"${entry%%[![:space:]]*}"}"
+    local entry_number
+    entry_number="${entry%%[![:digit:]]*}"
+    entry="${entry#"${entry%%[![:digit:]]*}"}"
+    entry="${entry#"${entry%%[![:space:]]*}"}"
+    local entry_timestamp
+    entry_timestamp="${entry%%[![:digit:]]*}"
+    entry="${entry#"${entry%%[![:digit:]]*}"}"
+    local entry_command
+    entry_command="${entry# }"
 
     builtin history -a
 
@@ -165,31 +207,23 @@ INSERT OR IGNORE INTO commands
     start_time,
     end_time,
     duration,
-    pipe_vals,
     command
 )
 VALUES (
     '${GSCHECHTLI_SESSION_NUMBER//\'/\'\'}',
     '${SHLVL//\'/\'\'}',
-    '${previous_number//\'/\'\'}',
+    '${entry_number//\'/\'\'}',
     '${gschechtli_tty//\'/\'\'}',
     '${EUID//\'/\'\'}',
-    '${GSCHECHTLI_PWD//\'/\'\'}',
-    '${previous_status//\'/\'\'}',
-    '${previous_timestamp//\'/\'\'}',
-    $( date +%s ),
+    '${PWD//\'/\'\'}',
+    '',
+    '${entry_timestamp//\'/\'\'}',
     0,
-    '${previous_pipestatus//\'/\'\'}',
-    '${previous_command//\'/\'\'}'
+    0,
+    '${entry_command//\'/\'\'}'
 )
 ;
 EOF
-
-    GSCHECHTLI_PWD="${PWD}"
-
-    # The PIPESTATUS variable is preserved.
-
-    return "${previous_status}"
 }
 
 gschechtli_trap_exit_and_term()
@@ -271,9 +305,9 @@ gschechtli_initialize()
 
     builtin trap "GSCHECHTLI_SKIP=1" INT
 
-    GSCHECHTLI_PWD="${PWD}"
-
     PROMPT_COMMAND+=("gschechtli_prompt_command \"\${?}\" \"\${PIPESTATUS[*]}\"")
+
+    PS0="\$( gschechtli_ps0_command )${PS0}"
 
     builtin trap "gschechtli_trap_exit_and_term \"\${?}\" \"\${PIPESTATUS[*]}\"" EXIT TERM
 
