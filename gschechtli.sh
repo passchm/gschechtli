@@ -77,7 +77,8 @@ gschechtli_session()
     local gschechtli_hostname
     gschechtli_hostname="$( uname -n )"
 
-    local gschechtli_pid="$$"
+    local gschechtli_pid
+    gschechtli_pid="$$"
 
     local gschechtli_time_zone
     gschechtli_time_zone="$( date +'%:z %Z' )"
@@ -123,7 +124,7 @@ VALUES (
 )
 RETURNING id;
 EOF
-)"
+    )"
 }
 
 gschechtli_prompt_command()
@@ -246,10 +247,11 @@ gschechtli_history_search()
     query+=" GROUP BY trimmed_command ORDER BY start_time DESC "
     query+=" ) "
 
-    local command
-    command="$( sqlite3 -readonly -safe "${GSCHECHTLI_DATABASE_FILE}" "${query}" | fzf )"
-    if [ -n "${command}" ]; then
-        echo "${command}"
+    local selected_command
+    selected_command="$( sqlite3 -readonly -safe "${GSCHECHTLI_DATABASE_FILE}" "${query}" | fzf )"
+    if [[ -n "${selected_command}" ]]
+    then
+        printf '%s\n' "${selected_command}"
     fi
 }
 
@@ -299,7 +301,7 @@ gschechtli_initialize()
 
     HISTTIMEFORMAT="%s "
 
-    shopt -s histappend
+    shopt -q -s histappend
 
     GSCHECHTLI_SKIP=1
 
